@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta charset="utf-8">
+        <title>Email in lavorazione</title>
+
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" integrity="sha512-dTfge/zgoMYpP7QbHy4gWMEGsbsdZeCXz7irItjcC3sPUFtf0kuFbDz/ixG7ArTxmDjLXDmezHubeNikyKGVyQ==" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css" integrity="sha384-aUGj/X2zp5rLCbBxumKTCw2Z50WgIr1vs/PFN4praOTvYXWlVyh2UtNUU0KAUhAX" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.2.0/css/all.css" integrity="sha384-hWVjflwFxL6sNzntih27bfxkr27PmbbK/iSvJ+a4+0owXq79v+lsFkW54bOGbiDQ"
+            crossorigin="anonymous">
+		<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+		<script src="https://sdk-cdn.mypurecloud.com/javascript/132.0.0/purecloud-platform-client-v2.min.js"></script>
+        <script src="https://sdk-cdn.mypurecloud.com/client-apps/2.3.0/purecloud-client-app-sdk-70ec0c8b.min.js"></script>
+     
+        <style>
+            body {
+                margin-left: 10px;
+                max-width: 480px;
+            }
+
+            .failure {
+                color: red;
+            }
+
+            section.interactions .header {
+                display: flex;
+                justify-content: space-between;
+            }
+			section.interactions h2 {
+				font-size:24px;
+			}
+
+            button.reload-interactions {
+                align-self: center;
+				margin-right: 12px;
+            }
+			input#cherry {
+				width: 400px;
+			}
+
+            .reloading {
+                margin: 10px;
+                text-align: center;
+                width: 100%;
+            }
+
+            table.interactions tbody tr {
+                cursor: pointer;
+            }
+
+            table.interactions tr td.media-type {
+                padding-left: 15px;
+                color: #337ab7;
+                display: table-cell;
+            }
+
+            table.interactions tr td.media-type.text-only {
+                padding-left: 0;
+                color: inherit;
+            }
+            table.interactions tbody tr.green td.status::before {
+                content: "";
+                margin-right: 5px;
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: green;
+            }
+            table.interactions tbody tr.orange td.status::before {
+                content: "";
+                margin-right: 5px;
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: orange;
+            }
+            table.interactions tbody tr.red td.status::before {
+                content: "";
+                margin-right: 5px;
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: red;
+                box-shadow: 0 0 0 rgba(204, 44, 44, 0.4);
+                animation: pulse 2s infinite;
+            }
+			table.interactions tbody tr.interactiondetails {
+				font-size:12px;
+			}
+
+            @keyframes pulse {
+                0% {
+                    box-shadow: 0 0 0 0 rgba(204, 44, 44, 0.4);
+                }
+                70% {
+                    box-shadow: 0 0 0 10px rgba(204, 44, 44, 0);
+                }
+                100% {
+                    box-shadow: 0 0 0 0 rgba(204, 44, 44, 0);
+                }
+            }
+
+            .tester-note {
+                font-size: .75em;
+                text-align: center;
+            }
+        </style>
+    </head>
+
+    <body>
+        <noscript>
+            For full functionality of this site it is necessary to enable JavaScript. Here are the <a href="http://www.enable-javascript.com/" target="_blank">instructions how to enable JavaScript in your web browser</a>.
+        </noscript>
+
+        <h1 class="sr-only">Test UIs for Interaction SDK</h1>
+
+        <section class="authenticating hidden">
+            Authenticating to Genesys Cloud <span class="fas fa-spinner fa-spin"></span>
+        </section>
+        <section class="failure hidden">
+            Sorry, an error has occurred.
+        </section>
+
+
+        <section class="interactions hidden">
+            <h2>Email in lavorazione</h2>
+            <div class="header">
+				<input type="text" class="form-control" id="cherry" name="cherry" autocomplete="off" placeholder="Ricerca..">
+                <button type="button" class="reload-interactions btn btn-primary fas fa-sync-alt" aria-label="reload"></button>
+            </div>
+
+            <table class="interactions table table-hover hidden" id="interactions">
+                <thead class="thead-dark">
+                    <tr>
+						<th scope="col">&nbsp;</th>
+                        <th scope="col">ID</th>
+                        <th scope="col">Cliente</th>
+                        <th scope="col">Tempo di lavorazione</th>
+                        <th scope="col">Prendi</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <section class="reloading fas fa-spinner fa-spin fa-3x hidden">
+            </section>
+        </section>
+
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                let platformClient = window.require('platformClient');
+
+                /*
+                * The Client Apps SDK can interpolate the current PC Environment into your app's URL
+                * EX: https://mypurecloud.github.io/client-app-sdk/directoryNavigationDemo.html?pcEnvironment={{pcEnvironment}}
+                *
+                * Reading the PC Environment from the query string or state param returned from OAuth2 response
+                */
+                let pcEnvironment = getEmbeddingPCEnv();
+                if (!pcEnvironment) {
+                    setErrorState('Cannot identify App Embedding context.  Did you forget to add pcEnvironment={{pcEnvironment}} to your app\'s query string?');
+                    return;
+                }
+
+                let client = platformClient.ApiClient.instance;
+                let clientApp = null;
+                try {
+                    clientApp = new window.purecloud.apps.ClientApp({
+                        pcEnvironment: pcEnvironment
+                    });
+                } catch (e) {
+                    setErrorState(pcEnvironment + ': Unknown/Unsupported Genesys Cloud Embed Context');
+                    return;
+                }
+
+ 				$('#cherry').keyup(function() {
+                    const searchtext = this.value.trim();
+					var table = document.getElementById('interactions');
+					for (var i = 1, row; row = table.rows[i]; i++) {
+						const conversationid = row.attributes['data-conversationid'].value;
+						const fromaddress = row.attributes['data-fromaddress'].value;
+						const fromname = row.attributes['data-fromname'].value;
+						if(!conversationid.toLowerCase().includes(searchtext.toLowerCase()) && !fromaddress.toLowerCase().includes(searchtext.toLowerCase()) && !fromname.toLowerCase().includes(searchtext.toLowerCase())){
+							row.classList.add('hidden');
+						} else {
+							row.classList.remove('hidden');
+						}
+					};
+                });
+
+
+                // Authenticate with Genesys Cloud
+                let authenticatingEl = document.querySelector('.authenticating');
+                setHidden(authenticatingEl, false);
+
+                let authenticated = false;
+                let userDataAcquired = false;
+                let canViewInteraction = false;
+                let canViewWrapUpCodes = false;
+
+                authenticate(client, pcEnvironment)
+                    .then(() => {
+                        authenticated = true;
+                        return new platformClient.UsersApi().getUsersMe({ 'expand': ['authorization'] })
+                    })
+                    .then(profileData => {
+                        userDataAcquired = true;
+
+                        // Check if the current user will be able to view interaction details
+                        let permissions = profileData.authorization.permissions;
+                        if (checkPermission(permissions, 'analytics:conversationDetail:view') &&
+                            checkPermission(permissions, 'analytics:conversationAggregate:view') &&
+                            (checkPermission(permissions, 'conversation:communication:view') ||
+                             checkPermission(permissions, 'quality:evaluation:add') ||
+                             checkPermission(permissions, 'quality:calibration:view') ||
+                             checkPermission(permissions, 'quality:evaluation:editScore'))) {
+                            canViewInteraction = true;
+                        }
+
+                        if (checkPermission(permissions, 'routing:wrapupCode:view')) {
+                            canViewWrapUpCodes = true;
+                        }
+
+                        let interactionExampleEl = document.querySelector('section.interactions');
+                        let interactionsHeaderEl = document.querySelector('section.interactions .header');
+                        let reloadButtonEl = document.querySelector('button.reload-interactions');
+                        let reloadingEl = document.querySelector('.reloading');
+                        let conversationsTable = document.querySelector('table.interactions');
+                        let conversationsTableBody = conversationsTable.querySelector('tbody');
+
+                        setHidden(authenticatingEl, true);
+
+                        // Update user data markup
+
+
+
+                        function reloadInteractions() {
+                            if (reloadButtonEl.disabled) {
+                                // Poor man's debounce: A click event snuck through before js could disable; ignore it
+                                return;
+                            }
+
+                            reloadButtonEl.disabled = true;
+
+                            // Set base state for reload op
+                            setErrorState(null);
+                            setHidden(reloadingEl, false);
+                            setHidden(conversationsTable, true);
+                            // Remove all rows of table
+                            while (conversationsTableBody.firstChild) {
+                                conversationsTableBody.removeChild(conversationsTableBody.firstChild);
+                            }
+
+                            getEmails('885058f1-d93f-49ac-83f5-1aed0292421e').then(function (results) {
+                                setHidden(reloadingEl, true);
+
+                                if (results.length === 0) {
+                                    setErrorState('Non ci sono pratiche in lavorazione');
+                                    reloadButtonEl.disabled = false;
+                                    return;
+                                }
+								
+								let emails = [];
+								for (i=0;i<results.length;i++ )
+								{
+									if(results[i].group.mediaType == 'email'){
+										emails = results[i].data[0].observations;
+									}
+								}
+								
+								for(i=0; i<emails.length; i++){
+
+                                    conversationsTableBody.appendChild(buildTrFromConversation(emails[i]));
+								}
+
+                                setHidden(conversationsTable, false);
+                                reloadButtonEl.disabled = false;
+                            }).catch(function (reason) {
+                                setHidden(reloadingEl, true);
+                                setErrorState('Failed to fetch your conversations');
+                                reloadButtonEl.disabled = false;
+                            });
+                        }
+
+                        reloadButtonEl.addEventListener('click', reloadInteractions);
+
+                        // Trigger initial fetch of interactions, will set state accordingly (i.e. disable the button)
+                        reloadInteractions();
+
+                        // Now, safe to show the interactions example
+                        setHidden(interactionExampleEl, false);
+                    })
+                    .catch(function (err) {
+                        setHidden(authenticatingEl, true);
+
+                        if (!authenticated) {
+                            setErrorState('Failed to Authenticate with Genesys Cloud - ' + err.message);
+                        } else if (!userDataAcquired) {
+                            setErrorState('Failed to locate user in Genesys Cloud');
+                        }
+                    });
+
+                // -- Utility Functions
+
+                function buildTrFromConversation(conversation) {
+                    let row = document.createElement('tr');
+
+                    var conversationId = conversation.conversationId;
+					var shortId = conversationId.substring(24);
+					row.setAttribute('data-conversationid', conversationId);
+					row.setAttribute('data-fromaddress', conversation.addressFrom);
+					row.setAttribute('data-fromname', conversation.participantName);
+					row.setAttribute('id', 'interaction-' + conversationId);
+					row.setAttribute('data-detailsopen', 0);
+					row.classList.add('interaction');
+
+					let cellStatus = row.insertCell();
+                    cellStatus.classList.add('status');
+					let cellConversationId = row.insertCell();
+                    cellConversationId.classList.add('conversation-id');
+                    let cellCustomerName = row.insertCell();
+					cellCustomerName.setAttribute('title', conversation.addressFrom);
+                    let cellDate = row.insertCell();
+					const queuetime = new Date(conversation.observationDate);
+					const now = new Date();
+					const diffTime = Math.abs(now - queuetime);
+					const diffHours = Math.floor(diffTime / (1000 * 60 * 60)); 
+					const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
+					let queuetext = '';
+					if(diffHours < 24) {
+						queuetext = diffHours + 'h';
+						row.classList.add('green');
+					}
+					else if (diffHours >= 24 && diffHours <48){
+						queuetext = 'un giorno';
+						row.classList.add('orange');
+					}
+					else {
+						queuetext = diffDays + ' giorni'; 
+						row.classList.add('red');
+					}
+					
+					row.addEventListener('click', function() {
+						let detailsopen = this.attributes['data-detailsopen'].value;
+						let id = this.attributes['data-conversationid'].value;
+						if(detailsopen == 0) {
+							let detailsrow = document.createElement('tr');
+							detailsrow.setAttribute('id', 'details-' + id);
+							detailsrow.classList.add('interactiondetails');
+							let detailscell = detailsrow.insertCell();
+							this.parentElement.insertBefore(detailsrow, this.nextSibling);
+							this.setAttribute('data-detailsopen', 1);
+							let cellDetails = detailsrow.insertCell();
+							cellDetails.colSpan = '5';
+							cellDetails.appendChild(document.createTextNode(this.attributes['data-fromaddress'].value));
+
+						} else {
+							$('#details-' + id).remove();
+							this.setAttribute('data-detailsopen', 0);
+						}
+					});
+
+
+					cellDate.appendChild(document.createTextNode(queuetext));
+                    let cellAssign = row.insertCell();
+                    // Wrap-up Cell
+					let btn = document.createElement("button");
+					btn.className = 'btn btn-primary fas fa-download';
+
+					btn.addEventListener('click', function() {
+						return new platformClient.UsersApi().getUsersMe({})
+						.then(profileData => {
+							return new platformClient.ConversationsApi().postConversationAssign(conversationId, profileData)
+							.then((data) => {
+								console.log(`postConversationAssign success! data: ${JSON.stringify(data, null, 2)}`);
+								row.remove();
+								$('#details-' + id).remove();
+							 })
+							 .catch((err) => {
+								clientApp.alerting.showToastPopup('Azione fallita', 'Occorre essere nello stato On Queue', {type:'warning', timeout: 5, markdownMessage: true, showCloseButton: true});
+								
+							});
+						});
+
+                    });
+                    cellAssign.appendChild(btn);
+
+
+ 
+
+                    // ID Cell
+                    cellConversationId.appendChild(document.createTextNode(shortId));
+
+
+                    cellCustomerName.appendChild(document.createTextNode(conversation.participantName));
+
+                    return row;
+                }
+
+
+				function getEmails(queueId){
+                    let query = {
+					 "filter": {
+					  "type": "or",
+					  "predicates": [
+					   {
+						"type": "dimension",
+						"dimension": "queueId",
+						"operator": "matches",
+						"value": queueId
+					   }
+					  ]
+					 },
+					 "metrics": [
+					  "oWaiting"
+					 ],
+					 "detailMetrics": [
+					  "oWaiting"
+					 ]
+					};
+					
+					return new platformClient.AnalyticsApi().postAnalyticsQueuesObservationsQuery(query)
+                        .then(function (results) {
+                            if (!results || !results.results) {
+                                return [];
+                            }
+                               
+							return results.results;
+                        }
+                    );
+				}
+
+
+                function setHidden(el, hidden) {
+                    if (hidden) {
+                        el.classList.add('hidden');
+                    } else {
+                        el.classList.remove('hidden');
+                    }
+                }
+
+                function extractParams(paramStr) {
+                    let result = {};
+
+                    if (paramStr) {
+                        let params = paramStr.split('&');
+                        params.forEach(function(currParam) {
+                            if (currParam) {
+                                let paramTokens = currParam.split('=');
+                                let paramName = paramTokens[0];
+                                let paramValue = paramTokens[1];
+                                if (paramName) {
+                                    paramName = decodeURIComponent(paramName);
+                                    paramValue = paramValue ? decodeURIComponent(paramValue) : null;
+
+                                    if (!result.hasOwnProperty(paramName)) {
+                                        result[paramName] = paramValue;
+                                    } else if (Array.isArray(result[paramName])) {
+                                        result[paramName].push(paramValue);
+                                    } else {
+                                        result[paramName] = [result[paramName], paramValue];
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    return result;
+                }
+
+                /**
+                 * Determine the embedding Genesys Cloud environment seeded on the query string or
+                 * being returned through the OAuth2 Implicit grant state hash param.
+                 *
+                 * @returns A string indicating the embedding PC env (e.g. mypurecloud.com, mypurecloud.jp); otherwise, null.
+                 */
+                function getEmbeddingPCEnv() {
+                    let result = null;
+
+                    if (window.location.hash && window.location.hash.indexOf('access_token') >= 0) {
+                        let oauthParams = extractParams(window.location.hash.substring(1));
+                        if (oauthParams && oauthParams.access_token && oauthParams.state) {
+                            // OAuth2 spec dictates this encoding
+                            // See: https://tools.ietf.org/html/rfc6749#appendix-B
+                            let stateSearch = unescape(oauthParams.state);
+                            result = extractParams(stateSearch).pcEnvironment;
+                        }
+                    }
+
+                    if (!result && window.location.search) {
+                        result = extractParams(window.location.search.substring(1)).pcEnvironment || null;
+                    }
+
+                    return result;
+                }
+
+                /**
+                 * Sets the base mode of the app to error and show the provided message
+                 */
+                function setErrorState(errorMsg) {
+                    let failureEl = document.querySelector('.failure');
+                    failureEl.textContent = errorMsg || '';
+                    setHidden(failureEl, !errorMsg);
+                }
+
+                function isPermission(item, targetItem) {
+                    let isItem = item === '*' || targetItem === '*';
+                    if (!isItem) {
+                        isItem = item === targetItem;
+                    }
+                    return isItem;
+                }
+
+                /**
+                 * Parse the permissions array and check whether or not the match the specified required ones.
+                 *
+                 * @returns A boolean indicating if the user possesses the required permissions.
+                 */
+                function checkPermission(permissions, permissionValue) {
+                    let isAllowed = false;
+
+                    if (!permissions) {
+                        permissions = [];
+                    }
+
+                    if (permissionValue.match(/^[a-zA-Z0-9]+:\*$/)) {
+                        permissionValue = permissionValue.replace('*', '*:*');
+                    }
+
+                    const permissionsToValidate = permissionValue.split(':'),
+                        targetDomain = permissionsToValidate[0],
+                        targetEntity = permissionsToValidate[1],
+                        targetAction = permissionsToValidate[2];
+
+                    permissions.forEach(function (permission) {
+                        const permissions = permission.split(':'),
+                            domain = permissions[0],
+                            entity = permissions[1],
+                            actionSet = permissions[2];
+
+                        if (targetDomain === domain) {
+                            const matchesEntity = isPermission(targetEntity, entity),
+                                matchesAction = isPermission(targetAction, actionSet);
+
+                            if (matchesEntity && matchesAction) {
+                                isAllowed = true;
+                            }
+                        }
+                    });
+
+                    return isAllowed;
+                }
+
+				// Authenticate with Genesys Cloud
+				function authenticate(client, pcEnvironment) {
+					// Allow targeting a different environment when host app is running locally
+					const platformEnvironment = pcEnvironment === 'localhost' ? 'mypurecloud.com' : pcEnvironment;
+					/*
+					* Note: To use this app in your own org, you will need to create your own OAuth2 Client(s)
+					* in your Genesys Cloud org.  After creating the Implicit grant client, map the client id(s) to
+					* the specified region key(s) in the object below, deploy the page, and configure an app to point to that URL.
+					*/
+					const pcOAuthClientIds = {'mypurecloud.de': '49cd810b-ea44-4a76-a4aa-8772b78e1b44'};
+					const clientId = pcOAuthClientIds[platformEnvironment];
+					if (!clientId) {
+						const defaultErr = platformEnvironment + ': Unknown/Unsupported Genesys Cloud Environment';
+						const localErr = `
+							The host app is running locally and the target platform client environment was mapped to '${platformEnvironment}'.
+							Ensure that you have an oauth client specified for this environment.
+						`;
+						return Promise.reject(new Error(pcEnvironment === 'localhost' ? localErr : defaultErr));
+					}
+
+					client.setEnvironment(platformEnvironment);
+					client.setPersistSettings(true);
+
+					const { origin, protocol, host, pathname } = window.location;
+					const redirectUrl = (origin || `${protocol}//${host}`) + pathname;
+
+					return client.loginImplicitGrant(clientId, redirectUrl, {state: `pcEnvironment=${pcEnvironment}`})
+						.then(data => {
+							window.history.replaceState(null, '', `${pathname}?${data.state}`);
+						});
+				}
+
+
+            });
+        </script>
+    </body>
+</html>
