@@ -162,7 +162,7 @@
                 */
                 let pcEnvironment = getEmbeddingPCEnv();
                 if (!pcEnvironment) {
-                    setErrorState('Cannot identify App Embedding context.  Did you forget to add pcEnvironment={{pcEnvironment}} to your app\'s query string?');
+                    setErrorState('Missing pcEnvironment param in the query string');
                     return;
                 }
 
