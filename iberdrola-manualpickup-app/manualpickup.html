@@ -16,7 +16,6 @@
         <style>
             body {
                 margin-left: 10px;
-                max-width: 480px;
             }
 
             .failure {
@@ -27,13 +26,19 @@
                 display: flex;
                 justify-content: space-between;
             }
+            section.interactions .headertext {
+                display: flex;
+            }
+            section.interactions .headertext h2 {
+                margin:10px;
+            }
 			section.interactions h2 {
 				font-size:24px;
 			}
 
             button.reload-interactions {
                 align-self: center;
-				margin-right: 12px;
+				margin-left: 12px;
             }
 			input#cherry {
 				width: 400px;
@@ -127,10 +132,14 @@
 
 
         <section class="interactions hidden">
-            <h2>Email in lavorazione</h2>
+			<div class="header">
+				<div class="headertext">
+					<h2>Email in lavorazione</h2>
+					<button type="button" class="reload-interactions btn btn-primary fas fa-sync-alt" aria-label="reload"></button>
+				</div>
+			</div>
             <div class="header">
 				<input type="text" class="form-control" id="cherry" name="cherry" autocomplete="off" placeholder="Ricerca..">
-                <button type="button" class="reload-interactions btn btn-primary fas fa-sync-alt" aria-label="reload"></button>
             </div>
 
             <table class="interactions table table-hover hidden" id="interactions">
@@ -139,6 +148,7 @@
 						<th scope="col">&nbsp;</th>
                         <th scope="col">ID</th>
                         <th scope="col">Cliente</th>
+						<th scope="col">Email cliente</th>
                         <th scope="col">Tempo di lavorazione</th>
                         <th scope="col">Prendi</th>
                     </tr>
@@ -320,15 +330,21 @@
 
 					let cellStatus = row.insertCell();
                     cellStatus.classList.add('status');
+
 					let cellConversationId = row.insertCell();
                     cellConversationId.classList.add('conversation-id');
                     cellConversationId.appendChild(document.createTextNode(shortId));
 					cellConversationId.addEventListener('click', CellClickEvent);
-                    let cellCustomerName = row.insertCell();
-					cellCustomerName.setAttribute('title', conversation.addressFrom);
+
+					let cellCustomerName = row.insertCell();
                     cellCustomerName.appendChild(document.createTextNode(conversation.participantName));
 					cellCustomerName.addEventListener('click', CellClickEvent);
-                    let cellDate = row.insertCell();
+
+                    let cellFromEmail = row.insertCell();
+                    cellFromEmail.appendChild(document.createTextNode(conversation.addressFrom));
+					cellFromEmail.addEventListener('click', CellClickEvent);
+					
+					let cellDate = row.insertCell();
 					const queuetime = new Date(conversation.observationDate);
 					const now = new Date();
 					const diffTime = Math.abs(now - queuetime);
@@ -380,6 +396,7 @@
                 }
 
 				function CellClickEvent() {
+					return false; // attualmente disabilitato
 					let row = this.parentElement;
 					let detailsopen = row.attributes['data-detailsopen'].value;
 					let id = row.attributes['data-conversationid'].value;
