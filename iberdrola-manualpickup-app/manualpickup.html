@@ -322,8 +322,12 @@
                     cellStatus.classList.add('status');
 					let cellConversationId = row.insertCell();
                     cellConversationId.classList.add('conversation-id');
+                    cellConversationId.appendChild(document.createTextNode(shortId));
+					cellConversationId.addEventListener('click', CellClickEvent);
                     let cellCustomerName = row.insertCell();
 					cellCustomerName.setAttribute('title', conversation.addressFrom);
+                    cellCustomerName.appendChild(document.createTextNode(conversation.participantName));
+					cellCustomerName.addEventListener('click', CellClickEvent);
                     let cellDate = row.insertCell();
 					const queuetime = new Date(conversation.observationDate);
 					const now = new Date();
@@ -343,31 +347,13 @@
 						queuetext = diffDays + ' giorni'; 
 						row.classList.add('red');
 					}
-					
-					row.addEventListener('click', function() {
-						let detailsopen = this.attributes['data-detailsopen'].value;
-						let id = this.attributes['data-conversationid'].value;
-						if(detailsopen == 0) {
-							let detailsrow = document.createElement('tr');
-							detailsrow.setAttribute('id', 'details-' + id);
-							detailsrow.classList.add('interactiondetails');
-							let detailscell = detailsrow.insertCell();
-							this.parentElement.insertBefore(detailsrow, this.nextSibling);
-							this.setAttribute('data-detailsopen', 1);
-							let cellDetails = detailsrow.insertCell();
-							cellDetails.colSpan = '5';
-							cellDetails.appendChild(document.createTextNode(this.attributes['data-fromaddress'].value));
-
-						} else {
-							$('#details-' + id).remove();
-							this.setAttribute('data-detailsopen', 0);
-						}
-					});
-
 
 					cellDate.appendChild(document.createTextNode(queuetext));
+					cellDate.addEventListener('click', CellClickEvent);
                     let cellAssign = row.insertCell();
-                    // Wrap-up Cell
+					cellAssign.addEventListener('click', function() {
+						return false;
+					});
 					let btn = document.createElement("button");
 					btn.className = 'btn btn-primary fas fa-download';
 
@@ -378,7 +364,8 @@
 							.then((data) => {
 								console.log(`postConversationAssign success! data: ${JSON.stringify(data, null, 2)}`);
 								row.remove();
-								$('#details-' + id).remove();
+								$('#interaction-' + conversationId).remove();
+								$('#details-' + conversationId).remove();
 							 })
 							 .catch((err) => {
 								clientApp.alerting.showToastPopup('Azione fallita', 'Occorre essere nello stato On Queue', {type:'warning', timeout: 5, markdownMessage: true, showCloseButton: true});
@@ -389,18 +376,29 @@
                     });
                     cellAssign.appendChild(btn);
 
-
- 
-
-                    // ID Cell
-                    cellConversationId.appendChild(document.createTextNode(shortId));
-
-
-                    cellCustomerName.appendChild(document.createTextNode(conversation.participantName));
-
                     return row;
                 }
 
+				function CellClickEvent() {
+					let row = this.parentElement;
+					let detailsopen = row.attributes['data-detailsopen'].value;
+					let id = row.attributes['data-conversationid'].value;
+					if(detailsopen == 0) {
+						let detailsrow = document.createElement('tr');
+						detailsrow.setAttribute('id', 'details-' + id);
+						detailsrow.classList.add('interactiondetails');
+						let detailscell = detailsrow.insertCell();
+						row.parentElement.insertBefore(detailsrow, row.nextSibling);
+						row.setAttribute('data-detailsopen', 1);
+						let cellDetails = detailsrow.insertCell();
+						cellDetails.colSpan = '5';
+						cellDetails.appendChild(document.createTextNode(row.attributes['data-fromaddress'].value));
+
+					} else {
+						$('#details-' + id).remove();
+						row.setAttribute('data-detailsopen', 0);
+					}
+				}
 
 				function getEmails(queueId){
                     let query = {
