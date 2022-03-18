@@ -150,7 +150,7 @@
                         <th scope="col">Cliente</th>
 						<th scope="col">Email cliente</th>
                         <th scope="col">Tempo di lavorazione</th>
-                        <th scope="col">Prendi</th>
+                        <th scope="col">Riprendi</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -277,7 +277,7 @@
 								let emails = [];
 								for (i=0;i<results.length;i++ )
 								{
-									if(results[i].group.mediaType == 'email'){
+									if(results[i].group.mediaType == 'email' && results[i].data[0].observations != undefined){
 										emails = results[i].data[0].observations;
 									}
 								}
@@ -396,10 +396,12 @@
                 }
 
 				function CellClickEvent() {
-					return false; // attualmente disabilitato
+					//return false; // attualmente disabilitato
 					let row = this.parentElement;
 					let detailsopen = row.attributes['data-detailsopen'].value;
 					let id = row.attributes['data-conversationid'].value;
+					clientApp.conversations.showInteractionDetails(id);
+					return;
 					if(detailsopen == 0) {
 						let detailsrow = document.createElement('tr');
 						detailsrow.setAttribute('id', 'details-' + id);
